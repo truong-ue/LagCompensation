@@ -11,6 +11,7 @@
 #include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -26,7 +27,42 @@ void ALagCompensationPlayerController::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
+
+	if (!HasAuthority())
+	{
+		// Calculate Server Time Offset
+		CalculateServerTimeOffset();
+		//Set timer handle to update server time offset every 10s (optional)
+		GetWorldTimerManager().SetTimer(CalculateServerTimeOffsetTimerHandle,this, &ThisClass::CalculateServerTimeOffset, 10.0f, true);
+	}
 }
+
+void ALagCompensationPlayerController::CalculateServerTimeOffset()
+{
+	if (UWorld* World = GetWorld())
+	{
+		Server_CalculateServerTimeOffset(UGameplayStatics::GetTimeSeconds(World));
+	}
+}
+
+void ALagCompensationPlayerController::Server_CalculateServerTimeOffset_Implementation(float TimeAtRequest)
+{
+	if (UWorld* World = GetWorld())
+	{
+		Client_CalculateServerTimeOffset(TimeAtRequest, UGameplayStatics::GetTimeSeconds(World));
+	}
+}
+
+void ALagCompensationPlayerController::Client_CalculateServerTimeOffset_Implementation(float TimeAtRequest,
+	float TimeServer)
+{
+	if (UWorld* World = GetWorld())
+	{
+		float CurrentTime = UGameplayStatics::GetTimeSeconds(World);
+		ServerTimeOffset = FMath::Max(0, TimeServer - (TimeAtRequest + (CurrentTime - TimeAtRequest) / 2));
+	}
+}
+
 /*
 void ALagCompensationPlayerController::SetupInputComponent()
 {

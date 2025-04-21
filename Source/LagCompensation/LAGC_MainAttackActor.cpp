@@ -1,6 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "LAGC_MainAttackActor.h"
+
+#include "LagCompensationPlayerController.h"
+#include "Kismet/GameplayStatics.h"
 #include "Runtime/Engine/Classes/Kismet/KismetSystemLibrary.h"
 #include "Net/UnrealNetwork.h"
 
@@ -10,6 +13,8 @@ ALAGC_MainAttackActor::ALAGC_MainAttackActor()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
+	Active = false;
+	
 }
  
 void ALAGC_MainAttackActor::Deactivate()
@@ -31,16 +36,17 @@ void ALAGC_MainAttackActor::SetActive(bool IsActive, int32 Speed)
 	{
 		//LAUNCHING THE MAIN ATTACK :
 		//Create a timer to Deactivate the MainAttack once it reaches its final position
+		GetWorldTimerManager().ClearTimer(LifeSpanTimer);
 		GetWorldTimerManager().SetTimer(LifeSpanTimer, this, &ALAGC_MainAttackActor::Deactivate, CalculateSpeed(Speed), false);
 		
 		// we only launch on the floor (Z = 0)
-		InitialLoc3D = PawnInsti->GetActorLocation();
+		InitialLoc3D = GetInstigator()->GetActorLocation();
 		InitialLoc3D = { InitialLoc3D.X, InitialLoc3D.Y, 0 };
 
 		//we get the hero yaw rotation, so the MainAttack gets launch in front of the hero
-		FRotator HeroRot = PawnInsti->GetActorRotation();
+		FRotator HeroRot = GetInstigator()->GetActorRotation();
 		float HeroRotZ = HeroRot.Yaw;
-		FRotator MARot = { 0, 0, HeroRotZ };
+		FRotator MARot = { 0, HeroRotZ, 0 };
 
 		// Set the replicated value for the speed and Yaw
 		MASpeed = Speed;
@@ -50,7 +56,7 @@ void ALAGC_MainAttackActor::SetActive(bool IsActive, int32 Speed)
 		InitialLoc = { InitialLoc3D.X, InitialLoc3D.Y };
 
 		//Set the destination location (max range in front of hero)
-		FVector Forward01 = PawnInsti->GetActorForwardVector();
+		FVector Forward01 = GetInstigator()->GetActorForwardVector();
 		FVector Forward02 = Forward01 * MaxRange;
 		FVector End = InitialLoc3D + Forward02;
 		DestinationLocation = End;
@@ -61,15 +67,8 @@ void ALAGC_MainAttackActor::SetActive(bool IsActive, int32 Speed)
 		//we move it (here on server, in BP for clients)
 		MoveTo(End, MARot, CalculateSpeed(Speed));
 
-		//we just use this Trigger variable with a RepNotify to notify ALL clients a MainAttack has been launched and we do the move in the BP with the BP event.
-		if (Trigger < 255)
-		{
-			Trigger++;
-		}
-		else
-		{
-			Trigger = 1;
-		}
+		//we use this Trigger variable with a RepNotify to notify ALL clients a MainAttack has been launched and we do the move.
+		ActiveServerTime = UGameplayStatics::GetTimeSeconds(GetWorld());
 
 		//All MainAttacks are DORMANT so we ForceNetUpdate when needed (here when we launch it).
 		ForceNetUpdate();
@@ -97,7 +96,26 @@ int ALAGC_MainAttackActor::GetIndex()
 
 void ALAGC_MainAttackActor::OnRep_Trigger()
 {
-	BPEvent_Start();
+	//On projectile trigger
+	
+	FRotator Rotation = FRotator(0.0f, MAYaw, 0.0f);
+	FVector Direction = FRotationMatrix(Rotation).GetScaledAxis(EAxis::X).GetSafeNormal();
+
+	//Compute RangeOffset
+	float TimeDelay = 0.0f;
+	float RangeOffset = ComputeRangeOffset(TimeDelay);
+	
+	FVector InitLocation = FVector(InitialLoc, 0.0f) + Direction * RangeOffset;
+	FVector Destination = InitLocation + Direction * MaxRange;
+	
+	//we teleport the MainAttack to the offset location
+	TeleportTo(InitLocation, Rotation, true, true);
+	//we move it (for clients)
+	MoveTo(Destination, Rotation, CalculateSpeed(MASpeed));
+
+	//Predict Deactive on Client
+	GetWorldTimerManager().ClearTimer(LifeSpanTimer);
+	GetWorldTimerManager().SetTimer(LifeSpanTimer, this, &ALAGC_MainAttackActor::Deactivate, CalculateSpeed(MASpeed) - TimeDelay, false);
 }
 
 void ALAGC_MainAttackActor::MoveTo(FVector Destination, FRotator Rotation, float Speed)
@@ -119,18 +137,13 @@ void ALAGC_MainAttackActor::MoveToStop()
 	UKismetSystemLibrary::MoveComponentTo(RootComponent, FVector().ZeroVector, FRotator().ZeroRotator, false, false, 15.0f, true, EMoveComponentAction::Stop, LatentInfo);
 }
 
-void ALAGC_MainAttackActor::SetPawnInsti(APawn* Insti)
-{
-	PawnInsti = Insti;
-}
-
 void ALAGC_MainAttackActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps)const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ALAGC_MainAttackActor, MAYaw);
 	DOREPLIFETIME(ALAGC_MainAttackActor, InitialLoc);
 	DOREPLIFETIME(ALAGC_MainAttackActor, MASpeed);
-	DOREPLIFETIME(ALAGC_MainAttackActor, Trigger);
+	DOREPLIFETIME(ALAGC_MainAttackActor, ActiveServerTime);
 }
 
 float ALAGC_MainAttackActor::CalculateSpeed(int32 Speed)
@@ -138,4 +151,16 @@ float ALAGC_MainAttackActor::CalculateSpeed(int32 Speed)
 	MASpeed = Speed;
 	float MARealSpeed = (float)MASpeed / 10 * 2;
 	return MARealSpeed;
+}
+
+float ALAGC_MainAttackActor::ComputeRangeOffset(float& TimeDelay)
+{
+	if (ALagCompensationPlayerController* PC = Cast<ALagCompensationPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0)))
+	{
+		float ServerTimeOffset = PC->GetServerTimeOffset();
+		float CurrentTime = UGameplayStatics::GetTimeSeconds(GetWorld());
+		TimeDelay = CurrentTime + ServerTimeOffset - ActiveServerTime;
+		return MaxRange / CalculateSpeed(MASpeed) * TimeDelay;
+	}
+	return 0.0f;
 }

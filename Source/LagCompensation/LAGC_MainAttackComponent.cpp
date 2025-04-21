@@ -55,12 +55,11 @@ void ULAGC_MainAttackComponent::SpawnMainAttackPool(APawn* Creator)
 
 				if (PoolableActor != nullptr)
 				{
-					UGameplayStatics::FinishSpawningActor(PoolableActor, SpawnTransform);
-					
-					PoolableActor->SetPawnInsti(Creator);
-					
-					PoolableActor->SetActive(false, 0);
 					PoolableActor->SetIndex(i);
+					PoolableActor->SetInstigator(Creator);
+					UGameplayStatics::FinishSpawningActor(PoolableActor, SpawnTransform);
+					PoolableActor->SetActive(false, 0);
+					
 					//PoolableActor->OnMainAttackDespawn.AddDynamic(this, &ULAGC_MainAttackComponent::OnMainAttackDespawn);
 					AllMainAttack.Add(PoolableActor);
 					UE_LOG(LogTemp, Warning, TEXT("MainAttack added to AllMainAttack, index : %i"), i);

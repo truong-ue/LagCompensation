@@ -63,6 +63,26 @@ private:
 
 	//bool bIsTouch; // Is it a touch device
 	//float FollowTime; // For how long it has been pressed
+
+	UPROPERTY()
+	float ServerTimeOffset = 0.0f;
+
+	
+public:
+	FORCEINLINE float GetServerTimeOffset() const  { return ServerTimeOffset; }
+
+private:
+
+	FTimerHandle CalculateServerTimeOffsetTimerHandle;
+
+	void CalculateServerTimeOffset();
+	
+	UFUNCTION(Server, Reliable, Category = "Lag Compensation")
+	void Server_CalculateServerTimeOffset(float TimeAtRequest);
+
+	//Server reply to client request
+	UFUNCTION(Client, Reliable, Category = "Lag Compensation")
+	void Client_CalculateServerTimeOffset(float TimeAtRequest, float TimeServer);
 };
 
 

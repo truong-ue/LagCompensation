@@ -31,12 +31,12 @@ public:
 	UPROPERTY(BlueprintReadWrite, Replicated, Category = "Pool")
 	uint8 MASpeed = 125; //correspond au missile speed attribute/2
 
-	//Pour calculer la distance entre début et fin de trajectoire
+	//Pour calculer la distance entre dï¿½but et fin de trajectoire
 	UPROPERTY()
-	FVector_NetQuantize InitialLoc3D;
+	FVector_NetQuantize InitialLoc3D = FVector_NetQuantize::ZeroVector;
 	
 	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Pool")
-	FVector2D InitialLoc;
+	FVector2D InitialLoc = FVector2D::ZeroVector;
 
 	UFUNCTION()
 	void OnRep_Trigger();
@@ -45,10 +45,7 @@ public:
 	float MaxRange = 5000;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pool")
-	APawn* PawnInsti;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pool")
-	FVector DestinationLocation;
+	FVector DestinationLocation = FVector::ZeroVector;
 
 	UFUNCTION(Blueprintcallable, Category = "Pool")
 	void MoveTo(FVector Destination, FRotator Rotation, float Speed);
@@ -59,24 +56,24 @@ public:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BPEvent_Start();
 
-	UFUNCTION()
-	void SetPawnInsti(APawn* Insti);
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps)const override;
 
 protected:
-	//This variable is needed to retrigger a missile already used on client
-	//Need a different var than the InitialLoc because if a hero doesnt move the IniitalLoc doesnt change and thus doesnt trigger
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = "OnRep_Trigger", Category = "Pool")
-	uint8 Trigger;
 
 	float CalculateSpeed(int32 Speed);
 
 	bool Active;
 
-	int MainAttackIndex;
+	// Trigger event on Client to fire projectile
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = "OnRep_Trigger", Category = "Pool")
+	float ActiveServerTime = 0.0f;
+
+	int MainAttackIndex = -1;
 
 	FTimerHandle LifeSpanTimer;
 	FTimerHandle SearchTimer;
 
+public:
+	virtual float ComputeRangeOffset(float& TimeDelay);
 };
+
