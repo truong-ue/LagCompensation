@@ -16,22 +16,19 @@ ULAGC_MainAttackComponent::ULAGC_MainAttackComponent()
 
 ALAGC_MainAttackActor* ULAGC_MainAttackComponent::SpawnMainAttack(int32 Speed)
 {
-	ALAGC_MainAttackActor* PoolableActor;
-	IndexMainAttackToSpawn = IndexMainAttackToSpawn + 1;
-	if (IndexMainAttackToSpawn <= PoolMainAttackSize - 1)
+	if (GetOwner()->GetLocalRole() == ROLE_Authority)
 	{
+		IndexMainAttackToSpawn = IndexMainAttackToSpawn + 1;
+		if (IndexMainAttackToSpawn > PoolMainAttackSize - 1)
+		{
+			IndexMainAttackToSpawn = 0;
+		}
 		//UE_LOG(LogTemp, Warning, TEXT("MainAttack: IndexMainAttackToSpawn : %i"), IndexMainAttackToSpawn);
-		PoolableActor = AllMainAttack[IndexMainAttackToSpawn];
+		ALAGC_MainAttackActor* PoolableActor = AllMainAttack[IndexMainAttackToSpawn];
 		PoolableActor->SetActive(true, Speed);
 		return PoolableActor;
 	}
-	else
-	{
-		IndexMainAttackToSpawn = 0;
-		PoolableActor = AllMainAttack[0];
-		PoolableActor->SetActive(true, Speed);
-		return PoolableActor;
-	}
+	return nullptr;
 }
 
 //void ULAGC_MainAttackComponent::OnMainAttackDespawn(ALAGC_MainAttackActor* PoolActor)

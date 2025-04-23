@@ -19,42 +19,24 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Pool")
 	void Deactivate();
+	
+	void SetActive(bool bIsActive, int32 InSpeed = 0);
 
-	void SetActive(bool IsActive, int32 Speed);
+	UFUNCTION(NetMulticast, Reliable, Category = "Attack")
+	void NetMulti_ToggleTrigger(bool bIsActive, int32 InSpeed, float InActiveServerTime, FVector InLocation, FVector InDirection);
+	
 	void SetIndex(int Index);
 	bool IsActive();
 	int GetIndex();
 
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Pool")
-	float MAYaw = 0;
-
-	UPROPERTY(BlueprintReadWrite, Replicated, Category = "Pool")
+	UPROPERTY(BlueprintReadWrite, Category = "Attack")
 	uint8 MASpeed = 125; //correspond au missile speed attribute/2
-
-	//Pour calculer la distance entre d�but et fin de trajectoire
-	UPROPERTY()
-	FVector_NetQuantize InitialLoc3D = FVector_NetQuantize::ZeroVector;
 	
-	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Pool")
-	FVector2D InitialLoc = FVector2D::ZeroVector;
-
-	UFUNCTION()
-	void OnRep_Trigger();
-
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Pool")
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Attack")
 	float MaxRange = 5000;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pool")
-	FVector DestinationLocation = FVector::ZeroVector;
-
-	UFUNCTION(Blueprintcallable, Category = "Pool")
+	UFUNCTION(Blueprintcallable, Category = "Attack")
 	void MoveTo(FVector Destination, FRotator Rotation, float Speed);
-
-	UFUNCTION(Blueprintcallable, Category = "Pool")
-	void MoveToStop();
-
-	UFUNCTION(BlueprintImplementableEvent)
-	void BPEvent_Start();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps)const override;
 
@@ -62,16 +44,23 @@ protected:
 
 	float CalculateSpeed(int32 Speed);
 
-	bool Active;
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Attack")
+	bool Active = false;
 
 	// Trigger event on Client to fire projectile
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = "OnRep_Trigger", Category = "Pool")
+	UPROPERTY(BlueprintReadOnly, Category = "Attack")
 	float ActiveServerTime = 0.0f;
+	
+	UPROPERTY(BlueprintReadWrite, Category = "Attack")
+	FVector Direction = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Attack")
+	FVector InitLocation = FVector::ZeroVector;
+
 
 	int MainAttackIndex = -1;
 
 	FTimerHandle LifeSpanTimer;
-	FTimerHandle SearchTimer;
 
 public:
 	virtual float ComputeRangeOffset(float& TimeDelay);
