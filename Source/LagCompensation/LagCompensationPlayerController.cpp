@@ -33,7 +33,7 @@ void ALagCompensationPlayerController::BeginPlay()
 		// Calculate Server Time Offset
 		CalculateServerTimeOffset();
 		//Set timer handle to update server time offset every 10s (optional)
-		GetWorldTimerManager().SetTimer(CalculateServerTimeOffsetTimerHandle,this, &ThisClass::CalculateServerTimeOffset, 10.0f, true);
+		//GetWorldTimerManager().SetTimer(CalculateServerTimeOffsetTimerHandle,this, &ThisClass::CalculateServerTimeOffset, 10.0f, true);
 	}
 }
 
