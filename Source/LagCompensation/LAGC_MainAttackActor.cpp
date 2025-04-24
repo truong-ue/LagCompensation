@@ -34,14 +34,14 @@ void ALAGC_MainAttackActor::SetActive(bool bIsActive, int32 InSpeed)
 		ActiveServerTime = UGameplayStatics::GetTimeSeconds(GetWorld());
 		APawn* LocalInstigator = GetInstigator();
 		InitLocation = LocalInstigator->GetActorLocation();
-		Direction = LocalInstigator->GetActorForwardVector();
+		MAYaw = LocalInstigator->GetActorRotation().Yaw;
 		
-		NetMulti_ToggleTrigger(bIsActive, InSpeed, ActiveServerTime, InitLocation, Direction);
+		NetMulti_ToggleTrigger(bIsActive, InSpeed, ActiveServerTime, FVector2D(InitLocation.X, InitLocation.Y), MAYaw);
 	}
 }
 
-void ALAGC_MainAttackActor::NetMulti_ToggleTrigger_Implementation(bool bIsActive, int32 InSpeed, float InActiveServerTime, FVector InLocation,
-	FVector InDirection)
+void ALAGC_MainAttackActor::NetMulti_ToggleTrigger_Implementation(bool bIsActive, int32 InSpeed, float InActiveServerTime, FVector2D InLocation,
+	float InYaw)
 {
 	SetActorHiddenInGame(!bIsActive);
 	SetActorEnableCollision(bIsActive);
@@ -49,11 +49,11 @@ void ALAGC_MainAttackActor::NetMulti_ToggleTrigger_Implementation(bool bIsActive
 	{
 		MASpeed = InSpeed;
 		ActiveServerTime = InActiveServerTime;
-		InitLocation = InLocation;
-		InitLocation.Z = 0.0f;
-		Direction = InDirection;
+		InitLocation = FVector(InLocation, 0.0f);
+		MAYaw = InYaw;
 
-		FRotator Rotation = Direction.Rotation();
+		FRotator Rotation = FRotator(0.0f, MAYaw, 0.0f);
+		FVector Direction = FRotationMatrix(Rotation).GetScaledAxis(EAxis::X);
 
 		float OverTime = CalculateSpeed(MASpeed);
 		//Compute RangeOffset
@@ -90,7 +90,6 @@ void ALAGC_MainAttackActor::NetMulti_ToggleTrigger_Implementation(bool bIsActive
 			GetWorldTimerManager().ClearTimer(LifeSpanTimer);
 			GetWorldTimerManager().SetTimer(LifeSpanTimer, this, &ThisClass::Deactivate, OverTime - TimeDelay, false);
 		}
-		
 	}
 	else
 	{

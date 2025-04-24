@@ -23,7 +23,7 @@ public:
 	void SetActive(bool bIsActive, int32 InSpeed = 0);
 
 	UFUNCTION(NetMulticast, Reliable, Category = "Attack")
-	void NetMulti_ToggleTrigger(bool bIsActive, int32 InSpeed, float InActiveServerTime, FVector InLocation, FVector InDirection);
+	void NetMulti_ToggleTrigger(bool bIsActive, int32 InSpeed, float InActiveServerTime, FVector2D InLocation, float InYaw);
 	
 	void SetIndex(int Index);
 	bool IsActive();
@@ -50,9 +50,10 @@ protected:
 	// Trigger event on Client to fire projectile
 	UPROPERTY(BlueprintReadOnly, Category = "Attack")
 	float ActiveServerTime = 0.0f;
-	
+
+	// Yaw
 	UPROPERTY(BlueprintReadWrite, Category = "Attack")
-	FVector Direction = FVector::ZeroVector;
+	float MAYaw = 0.0f;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Attack")
 	FVector InitLocation = FVector::ZeroVector;
