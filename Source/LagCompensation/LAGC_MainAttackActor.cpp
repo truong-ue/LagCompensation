@@ -14,7 +14,6 @@ ALAGC_MainAttackActor::ALAGC_MainAttackActor()
 	PrimaryActorTick.bCanEverTick = false;
 
 	Active = false;
-	
 }
  
 void ALAGC_MainAttackActor::Deactivate()
@@ -136,12 +135,17 @@ float ALAGC_MainAttackActor::CalculateSpeed(int32 Speed)
 
 float ALAGC_MainAttackActor::ComputeRangeOffset(float& TimeDelay)
 {
-	if (ALagCompensationPlayerController* PC = Cast<ALagCompensationPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0)))
+	if (!PlayerController)
 	{
-		float ServerTimeOffset = PC->GetServerTimeOffset();
-		float CurrentTime = UGameplayStatics::GetTimeSeconds(GetWorld());
-		TimeDelay = CurrentTime + ServerTimeOffset - ActiveServerTime;
-		return MaxRange / CalculateSpeed(MASpeed) * TimeDelay;
+		// Try to get player controller
+		PlayerController = Cast<ALagCompensationPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0));
+		if (!PlayerController){
+			return 0.0f;
+		}
 	}
-	return 0.0f;
+	
+	float ServerTimeOffset = PlayerController->GetServerTimeOffset();
+	float CurrentTime = UGameplayStatics::GetTimeSeconds(GetWorld());
+	TimeDelay = CurrentTime + ServerTimeOffset - ActiveServerTime;
+	return MaxRange / CalculateSpeed(MASpeed) * TimeDelay;
 }

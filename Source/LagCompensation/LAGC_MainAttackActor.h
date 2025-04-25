@@ -58,6 +58,8 @@ protected:
 	UPROPERTY(BlueprintReadWrite, Category = "Attack")
 	FVector InitLocation = FVector::ZeroVector;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category ="Attack") 
+	class ALagCompensationPlayerController* PlayerController;
 
 	int MainAttackIndex = -1;
 
