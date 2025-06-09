@@ -25,39 +25,64 @@ void ALAGC_MainAttackActor::Deactivate()
 	//ForceNetUpdate();
 }
 
-void ALAGC_MainAttackActor::SetActive(bool bIsActive, int32 InSpeed)
+void ALAGC_MainAttackActor::SetActive(bool bIsActive, uint8 InSpeed)
 {
 	Active = bIsActive;
 	if (HasAuthority())
 	{
-		ActiveServerTime = UGameplayStatics::GetTimeSeconds(GetWorld());
 		APawn* LocalInstigator = GetInstigator();
 		InitLocation = LocalInstigator->GetActorLocation();
-		MAYaw = LocalInstigator->GetActorRotation().Yaw;
+
+
+		// Make struct to send data via RPC
+		FAttackInfo AttackInfo;
+
+		// Set bIsActive (bit 3 in Flags)
+		if (bIsActive) AttackInfo.Flags |= (1 << 3);
+			else AttackInfo.Flags &= ~(1 << 3);
+		AttackInfo.Speed = InSpeed;
 		
-		NetMulti_ToggleTrigger(bIsActive, InSpeed, ActiveServerTime, FVector2D(InitLocation.X, InitLocation.Y), MAYaw);
+		// Only send Speed if it changed
+		if (MASpeed != InSpeed)
+		{
+			AttackInfo.Flags |= (1 << 0);
+		}
+
+		// @Todo: Only send data if change for yaw, location
+		AttackInfo.Flags |= (1 << 1);
+		AttackInfo.Flags |= (1 << 2);
+
+		AttackInfo.ActiveServerTime = UGameplayStatics::GetTimeSeconds(GetWorld());
+		AttackInfo.MAYaw = LocalInstigator->GetActorRotation().Yaw;
+		AttackInfo.InitLocation = FVector2f(InitLocation.X, InitLocation.Y);
+		
+		NetMulti_ToggleTrigger(AttackInfo);
 	}
 }
 
-void ALAGC_MainAttackActor::NetMulti_ToggleTrigger_Implementation(bool bIsActive, int32 InSpeed, float InActiveServerTime, FVector2D InLocation,
-	float InYaw)
+void ALAGC_MainAttackActor::NetMulti_ToggleTrigger_Implementation(FAttackInfo AttackInfo)
 {
-	SetActorHiddenInGame(!bIsActive);
-	SetActorEnableCollision(bIsActive);
-	if (bIsActive)
+	// Get bIsActive (bit 3 in Flags)
+	Active = AttackInfo.Flags & (1 << 3);
+	SetActorHiddenInGame(!Active);
+	SetActorEnableCollision(Active);
+	if (Active)
 	{
-		MASpeed = InSpeed;
-		ActiveServerTime = InActiveServerTime;
-		InitLocation = FVector(InLocation, 0.0f);
-		MAYaw = InYaw;
-
-		FRotator Rotation = FRotator(0.0f, MAYaw, 0.0f);
-		FVector Direction = FRotationMatrix(Rotation).GetScaledAxis(EAxis::X);
-
-		float OverTime = CalculateSpeed(MASpeed);
+		FRotator Rotation;
+		FVector Direction;
+		float OverTime;
 		//Compute RangeOffset
 		if (HasAuthority())
 		{
+			MASpeed = AttackInfo.Speed;
+			ActiveServerTime = AttackInfo.ActiveServerTime;
+			InitLocation = FVector(AttackInfo.InitLocation.X, AttackInfo.InitLocation.Y, 0.0f);
+			MAYaw = AttackInfo.MAYaw;
+
+			Rotation = FRotator(0.0f, MAYaw, 0.0f);
+			Direction = FRotationMatrix(Rotation).GetScaledAxis(EAxis::X);
+			OverTime = CalculateSpeed(MASpeed);
+			
 			// Move on Server side
 			FVector Destination = InitLocation + Direction * MaxRange;
 			
@@ -73,6 +98,27 @@ void ALAGC_MainAttackActor::NetMulti_ToggleTrigger_Implementation(bool bIsActive
 		}
 		else
 		{
+			ActiveServerTime = AttackInfo.ActiveServerTime;
+			
+			if (AttackInfo.Flags & 1 << 0)
+			{
+				MASpeed = AttackInfo.Speed; // Speed Changed
+			}
+			
+			if (AttackInfo.Flags & 1 << 1)
+			{
+				MAYaw = AttackInfo.MAYaw; // Yaw Changed
+			}
+			
+			if (AttackInfo.Flags & 1 << 2)
+			{
+				InitLocation = FVector(AttackInfo.InitLocation.X, AttackInfo.InitLocation.Y, 0.0f); // Init Location Changed
+			}
+
+			Rotation = FRotator(0.0f, MAYaw, 0.0f);
+			Direction = FRotationMatrix(Rotation).GetScaledAxis(EAxis::X);
+			OverTime = CalculateSpeed(MASpeed);
+			
 			// Move On Client side (lag compensation)
 			float TimeDelay = 0.0f;
 			float RangeOffset = ComputeRangeOffset(TimeDelay);
@@ -101,7 +147,7 @@ void ALAGC_MainAttackActor::SetIndex(int Index)
 	MainAttackIndex = Index;
 }
 
-bool ALAGC_MainAttackActor::IsActive()
+bool ALAGC_MainAttackActor::IsActive() const
 {
 	return Active;
 }
@@ -127,7 +173,7 @@ void ALAGC_MainAttackActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(ALAGC_MainAttackActor, Active);
 }
 
-float ALAGC_MainAttackActor::CalculateSpeed(int32 Speed)
+float ALAGC_MainAttackActor::CalculateSpeed(uint8 Speed)
 {
 	MASpeed = Speed;
 	return (float)MASpeed / 10.0f * 2.0f;

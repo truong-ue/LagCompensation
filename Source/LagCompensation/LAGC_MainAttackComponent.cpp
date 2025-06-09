@@ -14,7 +14,7 @@ ULAGC_MainAttackComponent::ULAGC_MainAttackComponent()
 	// ...
 }
 
-ALAGC_MainAttackActor* ULAGC_MainAttackComponent::SpawnMainAttack(int32 Speed)
+ALAGC_MainAttackActor* ULAGC_MainAttackComponent::SpawnMainAttack(uint8 Speed)
 {
 	if (GetOwner()->GetLocalRole() == ROLE_Authority)
 	{

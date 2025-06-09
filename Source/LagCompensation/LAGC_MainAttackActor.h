@@ -6,6 +6,71 @@
 
 //DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMainAttackDespawn, ALAGC_MainAttackActor*, LAGC_MainAttackComponent);
 
+USTRUCT()
+struct FAttackInfo
+{
+	GENERATED_BODY()
+	
+	// Flags to check what data be sent and store bIsActive (bit 3: bIsActive)
+	// Bit 0: Speed Changed
+	// Bit 1: Yaw Changed (not implement
+	// Bit 2: Location Changed
+	// Bit 3: bIsActive
+	// => LengthBits: 4
+	uint8 Flags = 0;                // 1 byte
+	uint8 Speed = 0;                // 1 byte
+	
+	float MAYaw = 0.0f;				// 4 bytes
+	float ActiveServerTime = 0.0f;  // 4 bytes
+	FVector2f InitLocation = FVector2f::ZeroVector; // 8 bytes
+	
+	
+	bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
+	{
+		Ar.SerializeBits(&Flags, 4);
+		
+		if (Ar.IsSaving())
+		{
+			if (Flags & 1 << 0) Ar << Speed;
+			if (Flags & 1 << 1)
+			{
+				// Compress Yaw
+				uint8 CompressedYaw = FMath::RoundToInt(MAYaw / 360.0f * 255.0f);
+				Ar << CompressedYaw;
+			}
+			if (Flags & 1 << 2) Ar << InitLocation;
+		}
+	
+		if (Ar.IsLoading())
+		{
+			if (Flags & 1 << 0) Ar << Speed;
+			if (Flags & 1 << 1)
+			{
+				uint8 CompressedYaw = 0;
+				Ar<<CompressedYaw;
+				MAYaw = static_cast<float>(CompressedYaw) / 255.0f * 360.0f;
+			}
+			if (Flags & 1 << 2) Ar << InitLocation;
+		}
+	
+		// Always send
+		Ar << ActiveServerTime;
+		
+		bOutSuccess = true;
+		return true;
+	}
+};
+
+template<>
+struct TStructOpsTypeTraits<FAttackInfo> : public TStructOpsTypeTraitsBase2<FAttackInfo>
+{
+	enum
+	{
+		WithNetSerializer = true,
+		WithNetSharedSerialization = false,
+	};
+};
+
 UCLASS()
 class LAGCOMPENSATION_API ALAGC_MainAttackActor : public AActor
 {
@@ -20,13 +85,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Pool")
 	void Deactivate();
 	
-	void SetActive(bool bIsActive, int32 InSpeed = 0);
+	void SetActive(bool bIsActive, uint8 InSpeed = 0);
 
 	UFUNCTION(NetMulticast, Reliable, Category = "Attack")
-	void NetMulti_ToggleTrigger(bool bIsActive, int32 InSpeed, float InActiveServerTime, FVector2D InLocation, float InYaw);
+	void NetMulti_ToggleTrigger(FAttackInfo AttackInfo);
 	
 	void SetIndex(int Index);
-	bool IsActive();
+	bool IsActive() const;
 	int GetIndex();
 
 	UPROPERTY(BlueprintReadWrite, Category = "Attack")
@@ -42,7 +107,7 @@ public:
 
 protected:
 
-	float CalculateSpeed(int32 Speed);
+	float CalculateSpeed(uint8 Speed);
 
 	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Attack")
 	bool Active = false;

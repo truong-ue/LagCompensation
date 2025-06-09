@@ -17,7 +17,7 @@ public:
 
 	//POOL OBJECT 1
 	UFUNCTION(BlueprintCallable, Category = "Pool")
-	ALAGC_MainAttackActor* SpawnMainAttack(int32 Speed);
+	ALAGC_MainAttackActor* SpawnMainAttack(uint8 Speed);
 
 	UPROPERTY(EditAnywhere, Category = "Object Pool")
 	TSubclassOf<class ALAGC_MainAttackActor> PoolMainAttackSubclass;
